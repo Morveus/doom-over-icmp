@@ -32,6 +32,10 @@ Inspired by [Doom Over DNS](https://github.com/resumex/doom-over-dns), this proj
 - A DOOM engine for the client machine (e.g., [chocolate-doom](https://www.chocolate-doom.org/))
 - `DOOM1.WAD` (shareware, freely available)
 
+**PowerShell client only:**
+- PowerShell 7+ (cross-platform) or Windows PowerShell 5.1
+- Administrator privileges (raw sockets)
+
 ## Quick Start
 
 ### Server
@@ -55,6 +59,19 @@ sudo python3 client.py <server-ip> --output doom1.wad
 
 # Use a different DOOM engine
 sudo python3 client.py <server-ip> --launcher crispy-doom
+```
+
+### Client (PowerShell - Windows)
+
+```powershell
+# Run as Administrator
+.\client.ps1 -Server <server-ip>
+
+# Save WAD without launching
+.\client.ps1 -Server <server-ip> -OutputPath doom1.wad
+
+# Use a different DOOM engine
+.\client.ps1 -Server <server-ip> -Launcher crispy-doom
 ```
 
 ## Protocol
