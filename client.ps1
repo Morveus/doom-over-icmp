@@ -310,14 +310,17 @@ try {
         Write-Host "  Launching: $Launcher -iwad $tempPath"
         Write-Host ""
 
+        $launchFailed = $false
         try {
             & $Launcher -iwad $tempPath
         }
         catch {
+            $launchFailed = $true
             Write-Host "Error: '$Launcher' not found. Install it or specify -Launcher." -ForegroundColor Red
             Write-Host "  The WAD is saved at: $tempPath" -ForegroundColor Yellow
         }
-        finally {
+        # Only clean up if the game launched successfully
+        if (-not $launchFailed) {
             if (Test-Path $tempPath) { Remove-Item $tempPath -ErrorAction SilentlyContinue }
         }
     }
