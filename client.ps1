@@ -297,8 +297,11 @@ try {
 
     # Step 4: Save or launch
     if ($OutputPath) {
-        [System.IO.File]::WriteAllBytes($OutputPath, $wadBytes)
-        Write-Host "  WAD saved to: $OutputPath" -ForegroundColor Green
+        $resolvedPath = [System.IO.Path]::GetFullPath(
+            [System.IO.Path]::Combine($PWD.Path, $OutputPath)
+        )
+        [System.IO.File]::WriteAllBytes($resolvedPath, $wadBytes)
+        Write-Host "  WAD saved to: $resolvedPath" -ForegroundColor Green
     }
     else {
         $tempPath = [System.IO.Path]::Combine(
