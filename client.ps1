@@ -295,36 +295,22 @@ try {
     Write-Host "       SHA-256 verified:   $($actualHash.Substring(0, 16))..."
     Write-Host ""
 
-    # Step 4: Save or launch
-    if ($OutputPath) {
-        $resolvedPath = [System.IO.Path]::GetFullPath(
-            [System.IO.Path]::Combine($PWD.Path, $OutputPath)
-        )
-        [System.IO.File]::WriteAllBytes($resolvedPath, $wadBytes)
-        Write-Host "  WAD saved to: $resolvedPath" -ForegroundColor Green
-    }
-    else {
-        $tempPath = [System.IO.Path]::Combine(
-            [System.IO.Path]::GetTempPath(),
-            "doom_icmp_$filename"
-        )
-        [System.IO.File]::WriteAllBytes($tempPath, $wadBytes)
-        Write-Host "  WAD written to: $tempPath"
-        Write-Host "  Launching: $Launcher -iwad $tempPath"
-        Write-Host ""
+    # Step 4: Save and optionally launch
+    $savePath = if ($OutputPath) { $OutputPath } else { $filename }
+    $resolvedPath = [System.IO.Path]::GetFullPath(
+        [System.IO.Path]::Combine($PWD.Path, $savePath)
+    )
+    [System.IO.File]::WriteAllBytes($resolvedPath, $wadBytes)
+    Write-Host "  WAD saved to: $resolvedPath" -ForegroundColor Green
 
-        $launchFailed = $false
+    if (-not $OutputPath) {
+        Write-Host "  Launching: $Launcher -iwad $resolvedPath"
+        Write-Host ""
         try {
-            & $Launcher -iwad $tempPath
+            & $Launcher -iwad $resolvedPath
         }
         catch {
-            $launchFailed = $true
             Write-Host "Error: '$Launcher' not found. Install it or specify -Launcher." -ForegroundColor Red
-            Write-Host "  The WAD is saved at: $tempPath" -ForegroundColor Yellow
-        }
-        # Only clean up if the game launched successfully
-        if (-not $launchFailed) {
-            if (Test-Path $tempPath) { Remove-Item $tempPath -ErrorAction SilentlyContinue }
         }
     }
 }
