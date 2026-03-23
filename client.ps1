@@ -91,41 +91,55 @@ function Send-ICMPRequest([System.Net.Sockets.Socket]$Socket,
                           [int]$TimeoutMs) {
     $request = New-ICMPEchoRequest -Id $DOOM_ICMP_ID -Seq $Seq
 
+    # Drain any stale packets from the buffer before sending
+    $Socket.ReceiveTimeout = 1
+    $drainBuf = [byte[]]::new(65535)
+    try { while ($Socket.Available -gt 0) { [void]$Socket.Receive($drainBuf) } }
+    catch [System.Net.Sockets.SocketException] { }
+
     [void]$Socket.SendTo($request, $EndPoint)
 
     $recvBuf = [byte[]]::new(65535)
-    $Socket.ReceiveTimeout = $TimeoutMs
+    $deadline = [System.Diagnostics.Stopwatch]::StartNew()
 
-    try {
-        $received = $Socket.Receive($recvBuf)
-        if ($received -lt 28) { return $null }  # IP header (20) + ICMP header (8) min
+    # Loop until we get our matching reply or timeout
+    while ($deadline.ElapsedMilliseconds -lt $TimeoutMs) {
+        $remaining = $TimeoutMs - [int]$deadline.ElapsedMilliseconds
+        if ($remaining -le 0) { break }
+        $Socket.ReceiveTimeout = $remaining
 
-        # Parse IP header to find ICMP offset (IHL field)
-        $ihl = ($recvBuf[0] -band 0x0F) * 4
+        try {
+            $received = $Socket.Receive($recvBuf)
+            if ($received -lt 28) { continue }  # IP header (20) + ICMP header (8) min
 
-        # Verify ICMP type=0 (Echo Reply)
-        if ($recvBuf[$ihl] -ne 0) { return $null }
+            # Parse IP header to find ICMP offset (IHL field)
+            $ihl = ($recvBuf[0] -band 0x0F) * 4
 
-        # Verify ICMP ID matches
-        $replyId = ([uint16]$recvBuf[$ihl + 4] -shl 8) -bor $recvBuf[$ihl + 5]
-        if ($replyId -ne $DOOM_ICMP_ID) { return $null }
+            # Verify ICMP type=0 (Echo Reply)
+            if ($recvBuf[$ihl] -ne 0) { continue }
 
-        # Verify sequence matches
-        $replySeq = ([uint16]$recvBuf[$ihl + 6] -shl 8) -bor $recvBuf[$ihl + 7]
-        if ($replySeq -ne $Seq) { return $null }
+            # Verify ICMP ID matches
+            $replyId = ([uint16]$recvBuf[$ihl + 4] -shl 8) -bor $recvBuf[$ihl + 5]
+            if ($replyId -ne $DOOM_ICMP_ID) { continue }
 
-        # Extract payload (after ICMP 8-byte header)
-        $payloadOffset = $ihl + 8
-        $payloadLen = $received - $payloadOffset
-        if ($payloadLen -le 0) { return $null }
+            # Verify sequence matches
+            $replySeq = ([uint16]$recvBuf[$ihl + 6] -shl 8) -bor $recvBuf[$ihl + 7]
+            if ($replySeq -ne $Seq) { continue }
 
-        $payload = [byte[]]::new($payloadLen)
-        [Array]::Copy($recvBuf, $payloadOffset, $payload, 0, $payloadLen)
-        return $payload
+            # Extract payload (after ICMP 8-byte header)
+            $payloadOffset = $ihl + 8
+            $payloadLen = $received - $payloadOffset
+            if ($payloadLen -le 0) { continue }
+
+            $payload = [byte[]]::new($payloadLen)
+            [Array]::Copy($recvBuf, $payloadOffset, $payload, 0, $payloadLen)
+            return $payload
+        }
+        catch [System.Net.Sockets.SocketException] {
+            break  # Timeout
+        }
     }
-    catch [System.Net.Sockets.SocketException] {
-        return $null  # Timeout
-    }
+    return $null
 }
 
 function Send-ICMPRequestWithRetry([System.Net.Sockets.Socket]$Socket,
